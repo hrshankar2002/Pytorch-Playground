@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
-from sklearn.datasets import make_blobs, make_circles
+from sklearn.datasets import make_blobs, make_circles, make_regression
 from sklearn.model_selection import train_test_split
 from torch import nn
 
@@ -27,9 +27,9 @@ class ClassifierModelSigmoid(nn.Module):
         super().__init__()
         self.linear_layer_stack = nn.Sequential(
             nn.Linear(in_features=input_features, out_features=hidden_units),
-            nn.ReLU(),
+            nn.Sigmoid(),
             nn.Linear(in_features=hidden_units, out_features=hidden_units),
-            nn.ReLU(),
+            nn.Sigmoid(),
             nn.Linear(in_features=hidden_units, out_features=output_features),
         )
 
@@ -50,7 +50,6 @@ class ClassifierPipeline:
         samples=None,
         seed=None,
         noise=None,
-        features=None,
         classes=None,
         activation=None,
     ):
@@ -62,7 +61,6 @@ class ClassifierPipeline:
         self.out_features = out_features
         self.classes = classes
         self.samples = samples
-        self.features = features
         self.seed = seed
         self.noise = noise
         self.model = None
@@ -138,7 +136,6 @@ class ClassifierPipeline:
 
         for _ in range(epochs + 1):
             y_logits = self.model(self.X_train).squeeze()
-            # y_pred = torch.round(torch.sigmoid(y_logits))
 
             loss = loss_fn(y_logits, self.y_train)
             self.train_loss += loss
@@ -155,8 +152,8 @@ class ClassifierPipeline:
                 test_loss = loss_fn(test_logits, self.y_test)
                 self.test_loss += test_loss
 
-            self.train_loss = self.train_loss / epochs
-            self.test_loss = self.test_loss / epochs
+            self.train_loss /= epochs
+            self.test_loss /= epochs
 
     def classifier_main(self):
         if self.dataset_type == "Make Circles":
@@ -172,7 +169,7 @@ class ClassifierPipeline:
         elif self.dataset_type == "Make Blobs":
             self.X, self.y = make_blobs(
                 n_samples=self.samples,
-                n_features=self.features,
+                n_features=self.in_features,
                 centers=self.classes,
                 cluster_std=1.5,
                 random_state=self.seed,
@@ -190,7 +187,7 @@ class ClassifierPipeline:
             self.model = ClassifierModelRelu(
                 self.in_features, self.out_features, self.hidden_features
             )
-        else:
+        elif self.activation == "Sigmoid":
             self.model = ClassifierModelSigmoid(
                 self.in_features, self.out_features, self.hidden_features
             )
@@ -202,17 +199,105 @@ class ClassifierPipeline:
         self.plot_decision_boundary()
 
 
-# ClassifierPipeline(18000, 'Make Circles', 0.2, 0.01, 2, 10, 1, 1000, 42, 0.03, activation='ReLU').classifier_main()
-ClassifierPipeline(
-    samples=1000,
-    classes=4,
-    features=2,
-    seed=42,
-    dataset_type="Make Blobs",
-    epochs=15000,
-    lr=0.1,
-    hidden_features=5,
-    in_features=2,
-    out_features=4,
-    activation="ReLU",
-).classifier_main()
+class LinearRegressionModel(nn.Module):
+    def __init__(self, input_size):
+        super(LinearRegressionModel, self).__init__()
+        self.linear = nn.Linear(input_size, 1)
+
+    def forward(self, x):
+        return self.linear(x)
+
+
+class RegressionPipeline:
+    def __init__(
+        self,
+        epochs=None,
+        lr=None,
+        samples=None,
+        test_size=None,
+        random_state=None,
+        noise=None,
+    ):
+
+        self.epochs = epochs
+        self.lr = lr
+        self.test_size = test_size
+        self.random_state = random_state
+        self.noise = noise
+        self.samples = samples
+        self.model = None
+        self.X_train = None
+        self.X_test = None
+        self.y_train = None
+        self.y_test = None
+        self.predicted = None
+
+    def generate_data(self):
+        X, y = make_regression(
+            n_samples=self.samples,
+            n_features=1,
+            noise=self.noise,
+            random_state=self.random_state,
+        )
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
+            X, y, test_size=self.test_size, random_state=self.random_state
+        )
+
+    def train_model(self):
+        input_size = self.X_train.shape[1]
+        self.model = LinearRegressionModel(input_size)
+        criterion = nn.MSELoss()
+        optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr)
+
+        for _ in range(self.epochs):
+            inputs = torch.from_numpy(self.X_train).float()
+            labels = torch.from_numpy(self.y_train).float().view(-1, 1)
+
+            optimizer.zero_grad()
+            outputs = self.model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+
+    def predict(self):
+        inputs = torch.from_numpy(self.X_test).float()
+        self.predicted = self.model(inputs).detach().numpy()
+
+    def plot_results(self, prediction=None):
+        plt.scatter(self.X_train, self.y_train, color="blue", label="Training data")
+        plt.scatter(self.X_test, self.y_test, color="green", label="Testing data")
+        plt.xlabel("X")
+        plt.ylabel("y")
+        plt.title("Linear Regression")
+        if prediction is not None:
+            plt.scatter(self.X_test, self.predicted, color="red", label="Predicted")
+            plt.savefig("img/endres.png")
+        else:
+            plt.savefig("img/ds_linreg.png")
+
+    def run(self):
+        self.generate_data()
+        self.plot_results()
+        self.train_model()
+        self.predict()
+        self.plot_results(self.predicted)
+
+
+RegressionPipeline(
+    epochs=10000, lr=0.03, samples=100, test_size=0.3, random_state=42, noise=10
+).run()
+
+# ClassifierPipeline(18000, 'Make Circles', 0.2, 0.01, 2, 10, 1, 1000, 42, 0.03, activation='Sigmoid').classifier_main()
+# ClassifierPipeline(
+#     samples=1000,
+#     classes=4,
+#     features=2,
+#     seed=32,
+#     dataset_type="Make Blobs",
+#     epochs=18000,
+#     lr=0.1,
+#     hidden_features=5,
+#     in_features=2,
+#     out_features=4,
+#     activation="Sigmoid",
+# ).classifier_main()
