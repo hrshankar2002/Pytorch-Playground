@@ -1,5 +1,5 @@
 .DS_Store
 __pycache__/
-venv/
 env/
-test.ipynb
+todo.txt
+db.sqlite3

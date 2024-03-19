@@ -6,7 +6,6 @@ from sklearn.datasets import make_blobs, make_circles, make_regression
 from sklearn.model_selection import train_test_split
 from torch import nn
 
-
 class ClassifierModelRelu(nn.Module):
     def __init__(self, input_features, output_features, hidden_units):
         super().__init__()
@@ -33,7 +32,6 @@ class ClassifierModelSigmoid(nn.Module):
         )
     def forward(self, X):
         return self.linear_layer_stack(X)
-
 
 class ClassifierPipeline:
     def __init__(
@@ -294,27 +292,3 @@ class RegressionPipeline:
         self.train_model()
         self.predict()
         self.plot_results(self.predicted)
-
-RegressionPipeline(
-    epochs=10000, 
-    lr=0.03, 
-    samples=100, 
-    test_size=0.3, 
-    random_state=42, 
-    noise=10
-).run()
-
-# ClassifierPipeline(18000, 'Make Circles', 0.2, 0.01, 2, 10, 1, 1000, 42, 0.03, activation='Sigmoid').run()
-# ClassifierPipeline(
-#     samples=1000,
-#     classes=4,
-#     features=2,
-#     seed=32,
-#     dataset_type="Make Blobs",
-#     epochs=18000,
-#     lr=0.1,
-#     hidden_features=5,
-#     in_features=2,
-#     out_features=4,
-#     activation="Sigmoid",
-# ).run()

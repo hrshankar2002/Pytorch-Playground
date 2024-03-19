@@ -1,3 +1,5 @@
 from django.contrib import admin
+from .models import Classifier, Regressor
 
-# Register your models here.
+admin.site.register(Regressor)
+admin.site.register(Classifier)
