@@ -3,3 +3,4 @@ __pycache__/
 env/
 todo.txt
 db.sqlite3
+server/projserver/helper/

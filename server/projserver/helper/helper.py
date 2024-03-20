@@ -8,31 +8,57 @@ from torch import nn
 
 
 class ClassifierModelRelu(nn.Module):
-    def __init__(self, input_features, output_features, hidden_units):
+    def __init__(self, 
+                 input_features, 
+                 output_features, 
+                 hidden_units,
+                 layer_count):
         super().__init__()
+        
+        self.layer_count = layer_count
+        self.hidden_units = hidden_units
+        
         self.linear_layer_stack = nn.Sequential(
             nn.Linear(in_features=input_features, out_features=hidden_units),
-            nn.ReLU(),
-            nn.Linear(in_features=hidden_units, out_features=hidden_units),
-            nn.ReLU(),
-            nn.Linear(in_features=hidden_units, out_features=output_features),
-        )
+            nn.ReLU()
+            )
+        self.add_stack()
+        self.linear_layer_stack.add_module('output layer', nn.Linear(hidden_units, output_features))
+        
     def forward(self, X):
         return self.linear_layer_stack(X)
+    
+    def add_stack(self):
+        for i in range(self.layer_count):
+            self.linear_layer_stack.add_module(f'hidden_layer{i+1}', nn.Linear(self.hidden_units, self.hidden_units))
+            self.linear_layer_stack.add_module(f'relu{i+1}', nn.ReLU())
 
 
 class ClassifierModelSigmoid(nn.Module):
-    def __init__(self, input_features, output_features, hidden_units):
+    def __init__(self, 
+                 input_features, 
+                 output_features, 
+                 hidden_units,
+                 layer_count):
         super().__init__()
+        
+        self.layer_count = layer_count
+        self.hidden_units = hidden_units
+        
         self.linear_layer_stack = nn.Sequential(
             nn.Linear(in_features=input_features, out_features=hidden_units),
-            nn.Sigmoid(),
-            nn.Linear(in_features=hidden_units, out_features=hidden_units),
-            nn.Sigmoid(),
-            nn.Linear(in_features=hidden_units, out_features=output_features),
-        )
+            nn.Sigmoid()
+            )
+        self.add_stack()
+        self.linear_layer_stack.add_module('output layer', nn.Linear(hidden_units, output_features))
+        
     def forward(self, X):
         return self.linear_layer_stack(X)
+    
+    def add_stack(self):
+        for i in range(self.layer_count):
+            self.linear_layer_stack.add_module(f'hidden_layer{i+1}', nn.Linear(self.hidden_units, self.hidden_units))
+            self.linear_layer_stack.add_module(f'sigmoid{i+1}', nn.Sigmoid())
 
 
 class ClassifierPipeline:
@@ -50,6 +76,7 @@ class ClassifierPipeline:
         noise=None,
         classes=None,
         activation=None,
+        layer_count=None
     ):
 
         self.epochs = epochs
@@ -61,21 +88,22 @@ class ClassifierPipeline:
         self.samples = samples
         self.seed = seed
         self.noise = noise
+        self.lr = lr
+        self.activation = activation
+        self.test_size = test_size
+        self.layer_count = layer_count
         self.model = None
         self.X_tensor = None
         self.y_tensor = None
         self.X = None
         self.y = None
-        self.lr = lr
-        self.test_size = test_size
         self.train_loss = 0
         self.test_loss = 0
         self.X_train = None
         self.y_train = None
         self.X_test = None
         self.y_test = None
-        self.activation = activation
-
+        
     def plot_decision_boundary(self):
         model = self.model
 
@@ -149,6 +177,9 @@ class ClassifierPipeline:
                 test_loss = loss_fn(test_logits, self.y_test)
                 self.test_loss += test_loss
 
+            self.train_loss = self.train_loss.clone()
+            self.test_loss = self.test_loss.clone()
+            
             self.train_loss /= epochs
             self.test_loss /= epochs
 
@@ -182,11 +213,11 @@ class ClassifierPipeline:
         )
         if self.activation == "ReLU":
             self.model = ClassifierModelRelu(
-                self.in_features, self.out_features, self.hidden_features
+                self.in_features, self.out_features, self.hidden_features, self.layer_count
             )
         elif self.activation == "Sigmoid":
             self.model = ClassifierModelSigmoid(
-                self.in_features, self.out_features, self.hidden_features
+                self.in_features, self.out_features, self.hidden_features, self.layer_count
             )
 
         optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr)
@@ -194,16 +225,16 @@ class ClassifierPipeline:
         self.classifier_train_loop(loss_fn, optimizer, self.epochs)
 
         self.plot_decision_boundary()
+        print(self.train_loss,self.test_loss)
 
 
 class LinearRegressionModel(nn.Module):
-    def __init__(self, input_size):
+    def __init__(self):
         super(LinearRegressionModel, self).__init__()
-        self.linear = nn.Linear(input_size, 1)
-
+        self.linear_stack = nn.Sequential(nn.Linear(1, 1))
+                                       
     def forward(self, x):
-        return self.linear(x)
-
+        return self.linear_stack(x)
 
 class RegressionPipeline:
     def __init__(
@@ -243,8 +274,7 @@ class RegressionPipeline:
         )
 
     def train_model(self):
-        input_size = self.X_train.shape[1]
-        self.model = LinearRegressionModel(input_size)
+        self.model = LinearRegressionModel()
         criterion = nn.MSELoss()
         optimizer = torch.optim.SGD(self.model.parameters(), lr=self.lr)
 
@@ -268,10 +298,11 @@ class RegressionPipeline:
                 loss_test = criterion(output_test, labels_test)
                 self.test_loss += loss_test
         
-        train_l = self.train_loss / self.epochs
-        test_l = self.train_loss / self.epochs
-        self.train_loss = train_l
-        self.test_loss = test_l
+        self.train_loss = self.train_loss.clone()
+        self.test_loss = self.test_loss.clone()
+            
+        self.train_loss /= self.epochs
+        self.test_loss /= self.epochs
 
     def predict(self):
         inputs = torch.from_numpy(self.X_test).float()
@@ -285,6 +316,7 @@ class RegressionPipeline:
         if prediction is not None:
             plt.scatter(self.X_test, self.predicted, color="red", label="Predicted")
             plt.savefig("img/endres.png")
+      
         else:
             plt.savefig("img/ds_linreg.png")
 
@@ -295,26 +327,39 @@ class RegressionPipeline:
         self.predict()
         self.plot_results(self.predicted)
 
-RegressionPipeline(
-    epochs=10000, 
-    lr=0.03, 
-    samples=100, 
-    test_size=0.3, 
-    random_state=42, 
-    noise=10
-).run()
+# RegressionPipeline(
+#     epochs=10000, 
+#     lr=0.03, 
+#     samples=100, 
+#     test_size=0.3, 
+#     random_state=42, 
+#     noise=10
+# ).run()
 
-# ClassifierPipeline(18000, 'Make Circles', 0.2, 0.01, 2, 10, 1, 1000, 42, 0.03, activation='Sigmoid').run()
 # ClassifierPipeline(
-#     samples=1000,
-#     classes=4,
-#     features=2,
+#     samples=100,
+#     classes=2,
 #     seed=32,
-#     dataset_type="Make Blobs",
+#     dataset_type="Make Circles",
 #     epochs=18000,
 #     lr=0.1,
-#     hidden_features=5,
+#     hidden_features=10,
 #     in_features=2,
-#     out_features=4,
-#     activation="Sigmoid",
-# ).run()
+#     out_features=1,
+#     activation="ReLU",
+#     layer_count=3
+#     ).run()
+
+ClassifierPipeline(
+    samples=1000,
+    classes=4,
+    seed=32,
+    dataset_type="Make Blobs",
+    epochs=18000,
+    lr=0.1,
+    hidden_features=5,
+    in_features=2,
+    out_features=4,
+    activation="Sigmoid",
+    layer_count=3
+).run()
