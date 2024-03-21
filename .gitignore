@@ -4,3 +4,7 @@ env/
 todo.txt
 db.sqlite3
 server/projserver/helper/
+serviceAccount.json
+.env
+.idea
+env 3/
