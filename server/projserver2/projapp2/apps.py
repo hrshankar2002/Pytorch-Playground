@@ -1,6 +1,6 @@
 from django.apps import AppConfig
 
 
-class ProjappConfig(AppConfig):
+class Projapp2Config(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'projapp'
+    name = 'projapp2'

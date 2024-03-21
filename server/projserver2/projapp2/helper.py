@@ -1,4 +1,7 @@
+import matplotlib
 import matplotlib.pyplot as plt
+
+matplotlib.use('Agg')
 import numpy as np
 import pandas as pd
 import torch
@@ -104,7 +107,7 @@ class ClassifierPipeline:
         self.X_test = None
         self.y_test = None
         
-    def plot_decision_boundary(self):
+    def plot_decision_boundary(self,endimg):
         model = self.model
 
         X = self.X_test
@@ -137,22 +140,22 @@ class ClassifierPipeline:
         plt.scatter(X[:, 0], X[:, 1], c=y, s=40, cmap=plt.cm.RdYlBu)
         plt.xlim(xx.min(), xx.max())
         plt.ylim(yy.min(), yy.max())
-        plt.savefig("img/endfig_cls.png")
+        plt.savefig(endimg)
         plt.close()
 
-    def make_blob_dataset_fig(self):
+    def make_blob_dataset_fig(self,dsimg):
         X_blob = torch.from_numpy(self.X).type(torch.float)
         y_blob = torch.from_numpy(self.y).type(torch.LongTensor)
 
         plt.scatter(X_blob[:, 0], X_blob[:, 1], c=y_blob, cmap=plt.cm.RdYlBu)
-        plt.savefig("img/ds_make_blobs.png")
+        plt.savefig(dsimg)
         plt.close()
 
-    def make_circle_dataset_fig(self):
+    def make_circle_dataset_fig(self,dsimg):
         df = pd.DataFrame({"X1": self.X[:, 0], "X2": self.X[:, 1], "label": self.y})
 
         plt.scatter(df["X1"], df["X2"], c=self.y, cmap=plt.cm.RdYlBu)
-        plt.savefig("ds_make_circles.png")
+        plt.savefig(dsimg)
         plt.close()
 
     def classifier_train_loop(self, loss_fn, optimizer, epochs):
@@ -183,12 +186,12 @@ class ClassifierPipeline:
             self.train_loss /= epochs
             self.test_loss /= epochs
 
-    def run (self):
+    def run (self, dsimg, endimg):
         if self.dataset_type == "Make Circles":
             self.X, self.y = make_circles(
                 self.samples, noise=self.noise, random_state=self.seed
             )
-            self.make_circle_dataset_fig()
+            self.make_circle_dataset_fig(dsimg)
             loss_fn = nn.BCEWithLogitsLoss()
 
             self.X = torch.from_numpy(self.X).type(torch.float)
@@ -202,7 +205,7 @@ class ClassifierPipeline:
                 cluster_std=1.5,
                 random_state=self.seed,
             )
-            self.make_blob_dataset_fig()
+            self.make_blob_dataset_fig(dsimg)
             loss_fn = nn.CrossEntropyLoss()
 
             self.X = torch.from_numpy(self.X).type(torch.float)
@@ -224,8 +227,8 @@ class ClassifierPipeline:
 
         self.classifier_train_loop(loss_fn, optimizer, self.epochs)
 
-        self.plot_decision_boundary()
-        print(self.train_loss,self.test_loss)
+        self.plot_decision_boundary(endimg)
+        return self.train_loss.item(), self.test_loss.item()
 
 
 class LinearRegressionModel(nn.Module):
@@ -308,58 +311,22 @@ class RegressionPipeline:
         inputs = torch.from_numpy(self.X_test).float()
         self.predicted = self.model(inputs).detach().numpy()
 
-    def plot_results(self, prediction=None):
+    def plot_results(self, dsimg=None, endimg=None, prediction=None):
         plt.scatter(self.X_train, self.y_train, color="blue", label="Training data")
         plt.scatter(self.X_test, self.y_test, color="green", label="Testing data")
         plt.xlabel("X")
         plt.ylabel("y")
         if prediction is not None:
             plt.scatter(self.X_test, self.predicted, color="red", label="Predicted")
-            plt.savefig("img/endres.png")
-      
+            plt.savefig(endimg)
         else:
-            plt.savefig("img/ds_linreg.png")
+            plt.savefig(dsimg)
+        plt.close()
 
-    def run(self):
+    def run(self, dsimg, endimg):
         self.generate_data()
-        self.plot_results()
+        self.plot_results(dsimg=dsimg)
         self.train_model()
         self.predict()
-        self.plot_results(self.predicted)
-
-# RegressionPipeline(
-#     epochs=10000, 
-#     lr=0.03, 
-#     samples=100, 
-#     test_size=0.3, 
-#     random_state=42, 
-#     noise=10
-# ).run()
-
-# ClassifierPipeline(
-#     samples=100,
-#     classes=2,
-#     seed=32,
-#     dataset_type="Make Circles",
-#     epochs=18000,
-#     lr=0.1,
-#     hidden_features=10,
-#     in_features=2,
-#     out_features=1,
-#     activation="ReLU",
-#     layer_count=3
-#     ).run()
-
-ClassifierPipeline(
-    samples=1000,
-    classes=4,
-    seed=32,
-    dataset_type="Make Blobs",
-    epochs=18000,
-    lr=0.1,
-    hidden_features=5,
-    in_features=2,
-    out_features=4,
-    activation="Sigmoid",
-    layer_count=3
-).run()
+        self.plot_results(endimg=endimg, prediction=self.predicted)
+        return self.train_loss.item(), self.test_loss.item()
